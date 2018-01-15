@@ -7,6 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Emgu.CV;
+using Emgu.CV.Structure;
+using Emgu.CV.CvEnum;
 
 namespace GazeCalibration
 {
@@ -15,7 +18,7 @@ namespace GazeCalibration
 		// private fields
 		private static readonly Object lockObject = new Object();
 		FormMain formMain;
-		FormMain.Feature lastFeature = null;
+		FormMain.GazeEventArgs lastFeature = null;
 		List<Point> clickedPoints = new List<Point>();
         float[] gridLinePositions = { 0.1f, 0.3f, 0.5f, 0.7f, 0.9f };
 
@@ -28,6 +31,16 @@ namespace GazeCalibration
 		}
 
 		// control event handlers
+		private void FormCalibration_Load(object sender, EventArgs e)
+		{
+			// register gaze event handler
+			formMain.GazeUpdated += FormMain_GazeUpdated;
+		}
+		private void FormCalibration_FormClosed(object sender, FormClosedEventArgs e)
+		{
+			// unregister gaze event handler
+			formMain.GazeUpdated -= FormMain_GazeUpdated;
+		}
 		private void FormCalibration_MouseClick(object sender, MouseEventArgs e)
 		{
 			Point p = new Point(e.X, e.Y);
@@ -38,7 +51,7 @@ namespace GazeCalibration
 				if (lastFeature != null)
 				{
 					clickedPoints.Add(p);
-					formMain.AddClickSample(p, lastFeature);
+					formMain.AddClickSample(p, lastFeature.EyeFeature);
 				}
 			}
 
@@ -90,27 +103,18 @@ namespace GazeCalibration
 			}
 		}
 
-		// public methods
-		public void UpdateGazeCaptureState(FormMain.Feature feature)
+		// gaze event handler
+		private void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
 		{
 			// update last feature
 			lock (lockObject)
 			{
-				this.lastFeature = feature;
+				this.lastFeature = e;
 			}
 
 			// request to redraw window
 			this.Invalidate();
 		}
-	}
 
-	// helper extension class
-	public static class InputExtensions {
-		public static int LimitToRange(
-			this int value, int inclusiveMinimum, int inclusiveMaximum) {
-			if (value < inclusiveMinimum) { return inclusiveMinimum; }
-			if (value > inclusiveMaximum) { return inclusiveMaximum; }
-			return value;
-		}
 	}
 }

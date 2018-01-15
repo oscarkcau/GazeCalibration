@@ -29,6 +29,7 @@ namespace GazeCalibration
 			// initialize all matrices and vectors
 			this.ATA = new Matrix<double>(n, n);
 			ATA.SetIdentity(new MCvScalar(penalty));
+			ATA[n-5, n-5] = 0;
 
 			this.ATb = new Matrix<double>(n, 1);
 			ATb.SetZero();

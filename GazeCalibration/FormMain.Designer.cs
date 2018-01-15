@@ -46,6 +46,7 @@
 			this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
 			this.toolStripButtonSaveModel = new System.Windows.Forms.ToolStripButton();
 			this.toolStripButtonLoadModel = new System.Windows.Forms.ToolStripButton();
+			this.toolStripButtonTrackingEvaluation = new System.Windows.Forms.ToolStripButton();
 			this.statusStripMain.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.imageBoxCapture)).BeginInit();
 			this.panel1.SuspendLayout();
@@ -55,6 +56,7 @@
 			// propertyGridSettings
 			// 
 			this.propertyGridSettings.Dock = System.Windows.Forms.DockStyle.Fill;
+			this.propertyGridSettings.HelpVisible = false;
 			this.propertyGridSettings.LineColor = System.Drawing.SystemColors.ControlDark;
 			this.propertyGridSettings.Location = new System.Drawing.Point(0, 0);
 			this.propertyGridSettings.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
@@ -67,18 +69,17 @@
 			this.statusStripMain.ImageScalingSize = new System.Drawing.Size(24, 24);
 			this.statusStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripStatusLabelMain});
-			this.statusStripMain.Location = new System.Drawing.Point(0, 901);
+			this.statusStripMain.Location = new System.Drawing.Point(0, 909);
 			this.statusStripMain.Name = "statusStripMain";
 			this.statusStripMain.Padding = new System.Windows.Forms.Padding(2, 0, 21, 0);
-			this.statusStripMain.Size = new System.Drawing.Size(902, 30);
+			this.statusStripMain.Size = new System.Drawing.Size(902, 22);
 			this.statusStripMain.TabIndex = 1;
 			this.statusStripMain.Text = "statusStrip1";
 			// 
 			// toolStripStatusLabelMain
 			// 
 			this.toolStripStatusLabelMain.Name = "toolStripStatusLabelMain";
-			this.toolStripStatusLabelMain.Size = new System.Drawing.Size(179, 25);
-			this.toolStripStatusLabelMain.Text = "toolStripStatusLabel1";
+			this.toolStripStatusLabelMain.Size = new System.Drawing.Size(0, 17);
 			// 
 			// splitter1
 			// 
@@ -86,7 +87,7 @@
 			this.splitter1.Location = new System.Drawing.Point(893, 0);
 			this.splitter1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
 			this.splitter1.Name = "splitter1";
-			this.splitter1.Size = new System.Drawing.Size(9, 901);
+			this.splitter1.Size = new System.Drawing.Size(9, 909);
 			this.splitter1.TabIndex = 2;
 			this.splitter1.TabStop = false;
 			// 
@@ -97,7 +98,7 @@
 			this.imageBoxCapture.Location = new System.Drawing.Point(0, 0);
 			this.imageBoxCapture.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
 			this.imageBoxCapture.Name = "imageBoxCapture";
-			this.imageBoxCapture.Size = new System.Drawing.Size(893, 901);
+			this.imageBoxCapture.Size = new System.Drawing.Size(893, 909);
 			this.imageBoxCapture.TabIndex = 2;
 			this.imageBoxCapture.TabStop = false;
 			// 
@@ -156,13 +157,15 @@
 			this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripButtonStartCapture,
             this.toolStripButtonGazeCalibration,
+            this.toolStripButtonTrackingEvaluation,
             this.toolStripButtonSelectionTest,
             this.toolStripSeparator1,
             this.toolStripButtonSaveModel,
             this.toolStripButtonLoadModel});
+			this.toolStrip1.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.Flow;
 			this.toolStrip1.Location = new System.Drawing.Point(0, 0);
 			this.toolStrip1.Name = "toolStrip1";
-			this.toolStrip1.Size = new System.Drawing.Size(893, 32);
+			this.toolStrip1.Size = new System.Drawing.Size(893, 64);
 			this.toolStrip1.TabIndex = 1;
 			this.toolStrip1.Text = "toolStrip1";
 			// 
@@ -196,7 +199,7 @@
 			// toolStripSeparator1
 			// 
 			this.toolStripSeparator1.Name = "toolStripSeparator1";
-			this.toolStripSeparator1.Size = new System.Drawing.Size(6, 32);
+			this.toolStripSeparator1.Size = new System.Drawing.Size(6, 23);
 			// 
 			// toolStripButtonSaveModel
 			// 
@@ -217,6 +220,15 @@
 			this.toolStripButtonLoadModel.Text = "Load Model";
 			this.toolStripButtonLoadModel.ToolTipText = "Load Regression Model";
 			this.toolStripButtonLoadModel.Click += new System.EventHandler(this.toolStripButtonLoadModel_Click);
+			// 
+			// toolStripButtonTrackingEvaluation
+			// 
+			this.toolStripButtonTrackingEvaluation.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButtonTrackingEvaluation.Image")));
+			this.toolStripButtonTrackingEvaluation.ImageTransparentColor = System.Drawing.Color.Magenta;
+			this.toolStripButtonTrackingEvaluation.Name = "toolStripButtonTrackingEvaluation";
+			this.toolStripButtonTrackingEvaluation.Size = new System.Drawing.Size(190, 29);
+			this.toolStripButtonTrackingEvaluation.Text = "Tracking Evaluation";
+			this.toolStripButtonTrackingEvaluation.Click += new System.EventHandler(this.toolStripButtonTrackingEvaluation_Click);
 			// 
 			// FormMain
 			// 
@@ -261,6 +273,7 @@
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
         private System.Windows.Forms.ToolStripButton toolStripButtonSaveModel;
         private System.Windows.Forms.ToolStripButton toolStripButtonLoadModel;
+		private System.Windows.Forms.ToolStripButton toolStripButtonTrackingEvaluation;
 	}
 }
 

@@ -45,18 +45,13 @@ namespace GazeCalibration
 			public Settings() { }
 		}
 
-		public class Feature
+		public class GazeEventArgs : EventArgs
 		{
-			public Rectangle Face { get; set; }
-			public Rectangle LeftEye { get; set; }
-			public Rectangle RightEye { get; set; }
-			public Rectangle LeftPupil { get; set; }
-			public Rectangle RightPupil { get; set; }
 			public Matrix<double> EyeFeature { get; set; }
 			public Point PredictedGaze { get; set; }
-
-			public Feature() { }
 		}
+		public delegate void GazeUpdatedHandler(object o, GazeEventArgs e);
+		public event GazeUpdatedHandler GazeUpdated;
 
 		// private fields for capture eye feature
 		private static readonly Object lockObject = new Object();
@@ -74,12 +69,10 @@ namespace GazeCalibration
 		CascadeClassifier eyeClassifier = null;
 
 		// private fields for calibration
-		FormCalibration formCalibration = null;
 		RidgeRegression regressionX = null;
 		RidgeRegression regressionY = null;
 
 		// private fields for selection test
-		FormSelectionTest formSelectionTest = null;
 
 		// constructor
 		public FormMain()
@@ -166,13 +159,18 @@ namespace GazeCalibration
 		}
 		private void toolStripButtonGazeCalibration_Click(object sender, EventArgs e)
 		{
-			this.formCalibration = new FormCalibration(this);
-			this.formCalibration.Show();
+			FormCalibration f = new FormCalibration(this);
+			f.Show();
 		}
 		private void toolStripButtonSelectionTest_Click(object sender, EventArgs e)
 		{
-			this.formSelectionTest = new FormSelectionTest(this);
-			this.formSelectionTest.Show();
+			FormSelectionTest f = new FormSelectionTest(this);
+			f.Show();
+		}
+		private void toolStripButtonTrackingEvaluation_Click(object sender, EventArgs e)
+		{
+			FormTrackingEvaluation f = new FormTrackingEvaluation(this);
+			f.Show();
 		}
 		private void toolStripButtonSaveModel_Click(object sender, EventArgs e)
 		{
@@ -200,94 +198,88 @@ namespace GazeCalibration
 		}
 
 		// public methods
-		public void AddClickSample(Point p, Feature f)
+		public void AddClickSample(Point p, Matrix<double> f)
 		{
 			// add feature to regression object
-			regressionX.AddFeature(f.EyeFeature, p.X);
-			regressionY.AddFeature(f.EyeFeature, p.Y);
+			regressionX.AddFeature(f, p.X);
+			regressionY.AddFeature(f, p.Y);
 		}
 
 		// main procedures
 		private void ProcessFrame(object sender, EventArgs e)
 		{
 			// retrieve and handle new frame
-			if (capture != null && capture.Ptr != IntPtr.Zero)
+
+			if (capture == null || capture.Ptr == IntPtr.Zero) return;
+
+			capture.Retrieve(frame, 0);
+
+			// detect face, eye, pupil and eye feature vector
+			DetectFeatures();
+
+			// show captured frame
+			if (settings.ShowCapturedImage)
 			{
-				capture.Retrieve(frame, 0);
+				imageBoxCapture.Image = frame;
+			}
 
-				// detect face, eye, pupil and eye feature vector
-				DetectFeatures();
+			// check for current detection status 
+			bool isDetectionOkay =
+				faces.Count == 1 &&
+				eyes.Count == 2 &&
+				faces[0].UpperLeftRegion().ContainPoint(eyes[0].Center()) &&
+				faces[0].UpperRightRegion().ContainPoint(eyes[1].Center());
 
-				// show captured frame
-				if (settings.ShowCapturedImage)
-				{
-					imageBoxCapture.Image = frame;
-				}
+			// prepare feature record and pass to calibration window
+			GazeEventArgs record = null;
+			if (isDetectionOkay)
+			{
+				// merge two feature vectors to one row vector
+				Mat concatedFeature = new Mat();
+				CvInvoke.HConcat(features[0], features[1], concatedFeature);
 
-				// if calibration window is shown, prepare feature record and pass to it
-				if (formCalibration != null)
-				{
-					// check for current detection status 
-					bool isDetectionOkay =
-						faces.Count == 1 &&
-						eyes.Count == 2 &&
-						faces[0].UpperLeftRegion().ContainPoint(eyes[0].Center()) &&
-						faces[0].UpperRightRegion().ContainPoint(eyes[1].Center());
+				// convert it into double type
+				concatedFeature.ConvertTo(concatedFeature, DepthType.Cv64F);
 
-					// prepare feature record and pass to calibration window
-					if (isDetectionOkay)
-					{
-						// merge two feature vectors to one row vector
-						Mat concatedFeature = new Mat();
-						CvInvoke.HConcat(features[0], features[1], concatedFeature);
-
-						// convert it into double type
-						concatedFeature.ConvertTo(concatedFeature, DepthType.Cv64F);
-
-						// convert it into double matrix and add padding values for constant term
-						Point e1 = eyes[0].Center();
-						Point e2 = eyes[1].Center();
-						Point f = faces[0].Center();
-						double f_width = faces[0].Width;
-						double f_height = faces[0].Height;
-						Matrix<double> padding = new Matrix<double>(
-							new double[,] {
-								{
-									1,
-									(e1.X - f.X) / f_width,
-									(e1.Y - f.Y) / f_height,
-									(e2.X - f.X) / f_width,
-									(e2.Y - f.Y) / f_height
-								}
+				// convert it into double matrix and add padding values for constant term
+				Point e1 = eyes[0].Center();
+				Point e2 = eyes[1].Center();
+				Point f = faces[0].Center();
+				double f_width = faces[0].Width;
+				double f_height = faces[0].Height;
+				Matrix<double> padding = new Matrix<double>(
+					new double[,] {
+							{
+								1,
+								(e1.X - f.X) / f_width,
+								(e1.Y - f.Y) / f_height,
+								(e2.X - f.X) / f_width,
+								(e2.Y - f.Y) / f_height
 							}
-						);
-						Matrix<double> featureVector = new Matrix<double>(concatedFeature.Rows, concatedFeature.Cols + 5);
-						CvInvoke.HConcat(concatedFeature, padding, featureVector);
-
-						// also compute the predict value using current regression models
-						int x = (int)regressionX.Predict(featureVector);
-						int y = (int)regressionY.Predict(featureVector);
-
-						Feature record = new Feature
-						{
-							Face = faces[0],
-							LeftEye = eyes[0],
-							RightEye = eyes[1],
-							LeftPupil = pupils[0],
-							RightPupil = pupils[1],
-							EyeFeature = featureVector,
-							PredictedGaze = new Point((int)x, (int)y)
-						};
-
-						formCalibration.UpdateGazeCaptureState(record);
-
-						this.toolStripStatusLabelMain.Text = x + " " + y;
 					}
-					else // otherwise pass null to calibration window
-					{
-						formCalibration.UpdateGazeCaptureState(null);
-					}
-				}
+				);
+				Matrix<double> featureVector = new Matrix<double>(concatedFeature.Rows, concatedFeature.Cols + 5);
+				CvInvoke.HConcat(concatedFeature, padding, featureVector);
+
+				// also compute the predict value using current regression models
+				int x = (int)regressionX.Predict(featureVector);
+				int y = (int)regressionY.Predict(featureVector);
+
+				// prepare feature record
+				record = new GazeEventArgs
+				{
+					EyeFeature = featureVector,
+					PredictedGaze = new Point((int)x, (int)y)
+				};
+
+				// show predicted gaze position
+				this.toolStripStatusLabelMain.Text = x + " " + y;
+			}
+
+			// if calibration window is shown, prepare feature record and pass to it
+			if (GazeUpdated != null && record != null)
+			{
+				GazeUpdated(this, record);
 			}
 		}
 		private void DetectFeatures()
@@ -530,6 +522,7 @@ namespace GazeCalibration
 			regressionX = models[0];
 			regressionY = models[1];
 		}
+
 	}
 
 	// helper extension class for Rectangle struct
@@ -562,6 +555,35 @@ namespace GazeCalibration
 			float dx = p1.X - p2.X;
 			float dy = p1.Y - p2.Y;
 			return Math.Sqrt(dx * dx + dy * dy);
+		}
+		public static PointF Multiply(this Point p, float f)
+		{
+			return new PointF(p.X * f, p.Y * f);
+		}
+		public static PointF Add(this Point p1, PointF p2)
+		{
+			return new PointF(p1.X + p2.X, p1.Y + p2.Y);
+		}
+		public static PointF Multiply(this PointF p, float f)
+		{
+			return new PointF(p.X * f, p.Y * f);
+		}
+		public static PointF Add(this PointF p1, PointF p2)
+		{
+			return new PointF(p1.X + p2.X, p1.Y + p2.Y);
+		}
+
+		public static int LimitToRange(this int value, int inclusiveMinimum, int inclusiveMaximum)
+		{
+			if (value < inclusiveMinimum) { return inclusiveMinimum; }
+			if (value > inclusiveMaximum) { return inclusiveMaximum; }
+			return value;
+		}
+		public static float LimitToRange(this float value, float inclusiveMinimum, float inclusiveMaximum)
+		{
+			if (value < inclusiveMinimum) { return inclusiveMinimum; }
+			if (value > inclusiveMaximum) { return inclusiveMaximum; }
+			return value;
 		}
 	}
 } 
