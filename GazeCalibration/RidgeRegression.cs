@@ -28,8 +28,8 @@ namespace GazeCalibration
 
 			// initialize all matrices and vectors
 			this.ATA = new Matrix<double>(n, n);
-			ATA.SetIdentity(new MCvScalar(penalty));
-			ATA[n-5, n-5] = 0;
+			ATA.SetIdentity(new MCvScalar(penalty)); // add regulation weights
+			ATA[n-5, n-5] = 0; // bias term has no regulation
 
 			this.ATb = new Matrix<double>(n, 1);
 			ATb.SetZero();
@@ -42,8 +42,10 @@ namespace GazeCalibration
 		}
 		public RidgeRegression() { }
 
-		public void AddFeature(Matrix<double> feature, double b) 
+		public void AddFeature(Matrix<double> feature, double b, bool updateWeights = true) 
 		{
+			// Add one sample to regression model
+
 			// FUCK! MulTransposed not working as expected
 			//Matrix<double> vTv = new Matrix<double>(N, N);
 			//CvInvoke.MulTransposed(feature, vTv, false);
@@ -53,6 +55,35 @@ namespace GazeCalibration
 			this.ATA += vTv;
 			this.ATb += feature.Transpose() * b;
 
+			if (updateWeights)
+			{
+				UpdateWeights();
+			}
+		}
+
+		public void AddFeatures(IEnumerable<Matrix<double>> features, double b, bool updateWeights = true)
+		{
+			// Add multiple samples to regression model
+
+			// FUCK! MulTransposed not working as expected
+			//Matrix<double> vTv = new Matrix<double>(N, N);
+			//CvInvoke.MulTransposed(feature, vTv, false);
+
+			foreach (var feature in features)
+			{
+				Matrix<double> vTv = feature.Transpose() * feature;
+
+				this.ATA += vTv;
+				this.ATb += feature.Transpose() * b;
+			}
+
+			if (updateWeights)
+			{
+				UpdateWeights();
+			}
+		}
+		public void UpdateWeights()
+		{
 			CvInvoke.Invert(ATA, inv, DecompMethod.Cholesky);
 			this.W = inv * ATb;
 		}

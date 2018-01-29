@@ -41,11 +41,9 @@ namespace GazeCalibration
 		Point currentTestPoint;
 		PointF averagedGazePosition;
 		GazeDisplayMode gazeDisplayMode = GazeDisplayMode.Individal;
-		bool isTestStated = false;
+		bool isTestStarted = false;
 		bool isFirstGazeUpdate = true;
-		bool isGazeLost = false;
 		Stopwatch stopwatch = new Stopwatch();
-
 		List<(Point, Point, long)> trackTrialRecords = new List<(Point, Point, long)>();
 
 		// constructor
@@ -68,18 +66,21 @@ namespace GazeCalibration
 		private void FormTrackingEvaluation_Paint(object sender, PaintEventArgs e)
 		{
 			Graphics g = e.Graphics;
+			g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
 			// clear window
 			g.Clear(SystemColors.Control);
 
 			// draw current test position
-			using (Pen b = isGazeLost ? new Pen(settings.TargetColor2,2) : new Pen(settings.TargetColor,2))
+			using (Pen b = lastGazePositions.Count > 0 ? new Pen(settings.TargetColor,2) : new Pen(settings.TargetColor2,2))
 			{
 				float centerX = currentTestPoint.X;
 				float centerY = currentTestPoint.Y;
 				float radius = settings.TargetRadius;
 				g.DrawEllipse(b, centerX - radius, centerY - radius,
 							  radius + radius, radius + radius);
+				g.DrawLine(b, centerX - radius, centerY, centerX + radius, centerY);
+				g.DrawLine(b, centerX, centerY - radius, centerX, centerY + radius);
 			}
 
 			int h = this.ClientSize.Height;
@@ -139,7 +140,7 @@ namespace GazeCalibration
 
 				// press ENTER to start test
 				case Keys.Enter:
-					if (isTestStated == false)
+					if (isTestStarted == false)
 					{
 						StartTest();
 					}
@@ -147,7 +148,7 @@ namespace GazeCalibration
 				
 				// press SPACE to complete a Trial
 				case Keys.Space:
-					if (isTestStated)
+					if (isTestStarted)
 					{
 						FinishedTrial();
 
@@ -159,25 +160,12 @@ namespace GazeCalibration
 					break;
 			}
 		}
-		private void timerGazeLost_Tick(object sender, EventArgs e)
-		{
-			this.timerGazeLost.Stop();
-			this.isGazeLost = true;
-
-			this.Invalidate();
-		}
 
 		// gaze update handler
-		private void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
+		private async void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
 		{
 			// add new gaze position to queue
 			lastGazePositions.Enqueue((e.PredictedGaze, e.EyeFeature, this.stopwatch.ElapsedMilliseconds));
-
-			// remove oldest position if more than the given number
-			if (lastGazePositions.Count > settings.NumOfGazePositions)
-			{
-				lastGazePositions.Dequeue();
-			}
 
 			// compute the averaged gaze position
 			if (isFirstGazeUpdate)
@@ -195,11 +183,12 @@ namespace GazeCalibration
 					);
 			}
 
-			// set timer and gaze lost flag
-			this.timerGazeLost.Stop();
-			this.timerGazeLost.Interval = settings.GazeLostTime;
-			this.timerGazeLost.Start();
-			this.isGazeLost = false;
+			// remember to request redrawing
+			this.Invalidate();
+
+			// schedule to remove feature after specified time 
+			await Task.Delay(settings.GazeLostTime);
+			this.lastGazePositions.Dequeue();
 
 			// remember to request redrawing
 			this.Invalidate();
@@ -246,9 +235,6 @@ namespace GazeCalibration
 			{
 				Point gazePosition = tuple.Item1;
 				long timeGap = currentTime - tuple.Item3;
-
-				// only process if the gaze tracking occurs within given time period before key press event
-				if (timeGap > settings.GazeLostTime) continue;
 				
 				// record trial result
 				this.trackTrialRecords.Add((currentTestPoint, gazePosition, timeGap));
@@ -256,15 +242,21 @@ namespace GazeCalibration
 				// update tracking models
 				if (settings.UpdateTrackingModel)
 				{
-					// todo: update regression tracking models
-					formMain.AddClickSample(currentTestPoint, tuple.Item2);
+					// update regression tracking models
+					// without update weights
+					formMain.RegressionX.AddFeature(tuple.Item2, currentTestPoint.X, false);
+					formMain.RegressionY.AddFeature(tuple.Item2, currentTestPoint.Y, false);
 				}
 			}
+
+			// update regression weights after adding all samples
+			formMain.RegressionX.UpdateWeights();
+			formMain.RegressionY.UpdateWeights();
 		}
 		private void StartTest()
 		{
 			this.labelStartText.Visible = false;
-			this.isTestStated = true;
+			this.isTestStarted = true;
 
 			this.stopwatch.Start();
 

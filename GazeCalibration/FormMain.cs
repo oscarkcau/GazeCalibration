@@ -54,7 +54,6 @@ namespace GazeCalibration
 		public event GazeUpdatedHandler GazeUpdated;
 
 		// private fields for capture eye feature
-		private static readonly Object lockObject = new Object();
 		Settings settings = new Settings();
 		VideoCapture capture = null;
 		Mat frame = new Mat();
@@ -68,9 +67,9 @@ namespace GazeCalibration
 		CascadeClassifier faceClassifier = null;
 		CascadeClassifier eyeClassifier = null;
 
-		// private fields for calibration
-		RidgeRegression regressionX = null;
-		RidgeRegression regressionY = null;
+		// public Properties for calibration
+		public RidgeRegression RegressionX { get; private set; } = null;
+		public RidgeRegression RegressionY { get; private set; } = null;
 
 		// private fields for selection test
 
@@ -84,8 +83,8 @@ namespace GazeCalibration
 			this.propertyGridSettings.SelectedObject = settings;
 
 			int n = (settings.FeatureExtraction_PatchWidth * settings.FeatureExtraction_PatchHeight) * 2 + 5;
-			regressionX = new RidgeRegression(n);
-			regressionY = new RidgeRegression(n);
+			RegressionX = new RidgeRegression(n);
+			RegressionY = new RidgeRegression(n);
 		}
 
 		// control event handlers
@@ -172,6 +171,11 @@ namespace GazeCalibration
 			FormTrackingEvaluation f = new FormTrackingEvaluation(this);
 			f.Show();
 		}
+		private void toolStripButtonAreaSelectionTest_Click(object sender, EventArgs e)
+		{
+			FormAreaSelectionTest f = new FormAreaSelectionTest(this);
+			f.Show(this);
+		}
 		private void toolStripButtonSaveModel_Click(object sender, EventArgs e)
 		{
 			SaveFileDialog d = new SaveFileDialog();
@@ -195,14 +199,6 @@ namespace GazeCalibration
 			{
 				LoadRegressionModel(d.FileName);
 			}
-		}
-
-		// public methods
-		public void AddClickSample(Point p, Matrix<double> f)
-		{
-			// add feature to regression object
-			regressionX.AddFeature(f, p.X);
-			regressionY.AddFeature(f, p.Y);
 		}
 
 		// main procedures
@@ -262,8 +258,8 @@ namespace GazeCalibration
 				CvInvoke.HConcat(concatedFeature, padding, featureVector);
 
 				// also compute the predict value using current regression models
-				int x = (int)regressionX.Predict(featureVector);
-				int y = (int)regressionY.Predict(featureVector);
+				int x = (int)RegressionX.Predict(featureVector);
+				int y = (int)RegressionY.Predict(featureVector);
 
 				// prepare feature record
 				record = new GazeEventArgs
@@ -505,7 +501,7 @@ namespace GazeCalibration
 		}
 		private void SaveRegressionModel(string filename)
 		{
-			RidgeRegression[] models = new RidgeRegression[] { regressionX, regressionY };
+			RidgeRegression[] models = new RidgeRegression[] { RegressionX, RegressionY };
 
 			XmlSerializer xs = new XmlSerializer(typeof(RidgeRegression[]));
 			StreamWriter sw = new StreamWriter(filename);
@@ -519,8 +515,8 @@ namespace GazeCalibration
 			RidgeRegression[] models = (RidgeRegression[])xs.Deserialize(sr);
 			sr.Close();
 
-			regressionX = models[0];
-			regressionY = models[1];
+			RegressionX = models[0];
+			RegressionY = models[1];
 		}
 
 	}

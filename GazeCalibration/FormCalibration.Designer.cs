@@ -43,6 +43,7 @@
 			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.FormCalibration_FormClosed);
 			this.Load += new System.EventHandler(this.FormCalibration_Load);
 			this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormCalibration_Paint);
+			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormCalibration_KeyDown);
 			this.MouseClick += new System.Windows.Forms.MouseEventHandler(this.FormCalibration_MouseClick);
 			this.ResumeLayout(false);
 

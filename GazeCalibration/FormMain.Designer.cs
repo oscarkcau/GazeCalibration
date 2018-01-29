@@ -42,11 +42,12 @@
 			this.toolStrip1 = new System.Windows.Forms.ToolStrip();
 			this.toolStripButtonStartCapture = new System.Windows.Forms.ToolStripButton();
 			this.toolStripButtonGazeCalibration = new System.Windows.Forms.ToolStripButton();
+			this.toolStripButtonTrackingEvaluation = new System.Windows.Forms.ToolStripButton();
 			this.toolStripButtonSelectionTest = new System.Windows.Forms.ToolStripButton();
 			this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
 			this.toolStripButtonSaveModel = new System.Windows.Forms.ToolStripButton();
 			this.toolStripButtonLoadModel = new System.Windows.Forms.ToolStripButton();
-			this.toolStripButtonTrackingEvaluation = new System.Windows.Forms.ToolStripButton();
+			this.toolStripButtonAreaSelectionTest = new System.Windows.Forms.ToolStripButton();
 			this.statusStripMain.SuspendLayout();
 			((System.ComponentModel.ISupportInitialize)(this.imageBoxCapture)).BeginInit();
 			this.panel1.SuspendLayout();
@@ -159,6 +160,7 @@
             this.toolStripButtonGazeCalibration,
             this.toolStripButtonTrackingEvaluation,
             this.toolStripButtonSelectionTest,
+            this.toolStripButtonAreaSelectionTest,
             this.toolStripSeparator1,
             this.toolStripButtonSaveModel,
             this.toolStripButtonLoadModel});
@@ -187,13 +189,22 @@
 			this.toolStripButtonGazeCalibration.Text = "Gaze Calibration";
 			this.toolStripButtonGazeCalibration.Click += new System.EventHandler(this.toolStripButtonGazeCalibration_Click);
 			// 
+			// toolStripButtonTrackingEvaluation
+			// 
+			this.toolStripButtonTrackingEvaluation.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButtonTrackingEvaluation.Image")));
+			this.toolStripButtonTrackingEvaluation.ImageTransparentColor = System.Drawing.Color.Magenta;
+			this.toolStripButtonTrackingEvaluation.Name = "toolStripButtonTrackingEvaluation";
+			this.toolStripButtonTrackingEvaluation.Size = new System.Drawing.Size(190, 29);
+			this.toolStripButtonTrackingEvaluation.Text = "Tracking Evaluation";
+			this.toolStripButtonTrackingEvaluation.Click += new System.EventHandler(this.toolStripButtonTrackingEvaluation_Click);
+			// 
 			// toolStripButtonSelectionTest
 			// 
 			this.toolStripButtonSelectionTest.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButtonSelectionTest.Image")));
 			this.toolStripButtonSelectionTest.ImageTransparentColor = System.Drawing.Color.Magenta;
 			this.toolStripButtonSelectionTest.Name = "toolStripButtonSelectionTest";
-			this.toolStripButtonSelectionTest.Size = new System.Drawing.Size(141, 29);
-			this.toolStripButtonSelectionTest.Text = "SelectionTest";
+			this.toolStripButtonSelectionTest.Size = new System.Drawing.Size(146, 29);
+			this.toolStripButtonSelectionTest.Text = "Selection Test";
 			this.toolStripButtonSelectionTest.Click += new System.EventHandler(this.toolStripButtonSelectionTest_Click);
 			// 
 			// toolStripSeparator1
@@ -221,14 +232,14 @@
 			this.toolStripButtonLoadModel.ToolTipText = "Load Regression Model";
 			this.toolStripButtonLoadModel.Click += new System.EventHandler(this.toolStripButtonLoadModel_Click);
 			// 
-			// toolStripButtonTrackingEvaluation
+			// toolStripButtonAreaSelectionTest
 			// 
-			this.toolStripButtonTrackingEvaluation.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButtonTrackingEvaluation.Image")));
-			this.toolStripButtonTrackingEvaluation.ImageTransparentColor = System.Drawing.Color.Magenta;
-			this.toolStripButtonTrackingEvaluation.Name = "toolStripButtonTrackingEvaluation";
-			this.toolStripButtonTrackingEvaluation.Size = new System.Drawing.Size(190, 29);
-			this.toolStripButtonTrackingEvaluation.Text = "Tracking Evaluation";
-			this.toolStripButtonTrackingEvaluation.Click += new System.EventHandler(this.toolStripButtonTrackingEvaluation_Click);
+			this.toolStripButtonAreaSelectionTest.Image = ((System.Drawing.Image)(resources.GetObject("toolStripButtonAreaSelectionTest.Image")));
+			this.toolStripButtonAreaSelectionTest.ImageTransparentColor = System.Drawing.Color.Magenta;
+			this.toolStripButtonAreaSelectionTest.Name = "toolStripButtonAreaSelectionTest";
+			this.toolStripButtonAreaSelectionTest.Size = new System.Drawing.Size(187, 29);
+			this.toolStripButtonAreaSelectionTest.Text = "Area Selection Test";
+			this.toolStripButtonAreaSelectionTest.Click += new System.EventHandler(this.toolStripButtonAreaSelectionTest_Click);
 			// 
 			// FormMain
 			// 
@@ -274,6 +285,7 @@
         private System.Windows.Forms.ToolStripButton toolStripButtonSaveModel;
         private System.Windows.Forms.ToolStripButton toolStripButtonLoadModel;
 		private System.Windows.Forms.ToolStripButton toolStripButtonTrackingEvaluation;
+		private System.Windows.Forms.ToolStripButton toolStripButtonAreaSelectionTest;
 	}
 }
 

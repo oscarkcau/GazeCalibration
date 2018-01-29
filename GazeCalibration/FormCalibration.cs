@@ -15,13 +15,20 @@ namespace GazeCalibration
 {
 	public partial class FormCalibration : Form
 	{
+		// settings class
+		private class Settings
+		{
+			public float[] GridLinePositions { get; set; } = { 0.1f, 0.3f, 0.5f, 0.7f, 0.9f };
+			public int GazeLostTime { get; set; } = 500;
+		}
+
 		// private fields
-		private static readonly Object lockObject = new Object();
+		Settings settings = new Settings();
 		FormMain formMain;
 		FormMain.GazeEventArgs lastFeature = null;
 		List<Point> clickedPoints = new List<Point>();
-        float[] gridLinePositions = { 0.1f, 0.3f, 0.5f, 0.7f, 0.9f };
-
+		Queue<Matrix<double>> recentFeatures = new Queue<Matrix<double>>();
+		
 		// constructor
 		public FormCalibration(FormMain main)
 		{
@@ -46,17 +53,32 @@ namespace GazeCalibration
 			Point p = new Point(e.X, e.Y);
 
 			// add click sample if feature exist
-			lock (lockObject)
+			if (lastFeature != null)
 			{
-				if (lastFeature != null)
-				{
-					clickedPoints.Add(p);
-					formMain.AddClickSample(p, lastFeature.EyeFeature);
-				}
+				clickedPoints.Add(p);
+
+				formMain.RegressionX.AddFeatures(recentFeatures, p.X);
+				formMain.RegressionY.AddFeatures(recentFeatures, p.Y);
 			}
 
 			// request to redraw window
 			this.Invalidate();
+		}
+		private void FormCalibration_KeyDown(object sender, KeyEventArgs e)
+		{
+			switch (e.KeyCode)
+			{
+				// press ESC to close the window
+				case Keys.Escape:
+					this.Close();
+					break;
+
+				// press key S to show settings dialog
+				case Keys.S:
+					FormSettings f = new FormSettings("Calibration Settings", this.settings);
+					f.ShowDialog(this);
+					break;
+			}
 		}
 		private void FormCalibration_Paint(object sender, PaintEventArgs e)
 		{
@@ -68,7 +90,7 @@ namespace GazeCalibration
             // draw grid lines
             int h = this.ClientSize.Height;
             int w = this.ClientSize.Width;
-            foreach (float pos in gridLinePositions)
+            foreach (float pos in settings.GridLinePositions)
             {
                 g.DrawLine(Pens.Green, 0, pos * h, w, pos * h);
                 g.DrawLine(Pens.Green, pos * w, 0, pos * w, h);
@@ -87,8 +109,6 @@ namespace GazeCalibration
 			foreach (Point p in clickedPoints)
 			{
                 g.DrawEllipse(Pens.Blue, p.X - r, p.Y - r, r * 2, r * 2);
-				//g.DrawLine(Pens.Blue, p.X - r, p.Y, p.X + r, p.Y);
-				//g.DrawLine(Pens.Blue, p.X, p.Y - r, p.X, p.Y + r);
 			}
 
 			// draw gaze prediction
@@ -104,16 +124,20 @@ namespace GazeCalibration
 		}
 
 		// gaze event handler
-		private void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
+		private async void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
 		{
 			// update last feature
-			lock (lockObject)
-			{
-				this.lastFeature = e;
-			}
+			this.lastFeature = e;
+
+			// store feature to queue
+			recentFeatures.Enqueue(e.EyeFeature);
 
 			// request to redraw window
 			this.Invalidate();
+
+			// schedule to remove feature after specified time 
+			await Task.Delay(settings.GazeLostTime);
+			recentFeatures.Dequeue();
 		}
 
 	}
