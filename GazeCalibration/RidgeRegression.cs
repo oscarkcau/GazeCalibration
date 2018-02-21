@@ -18,7 +18,7 @@ namespace GazeCalibration
 		public Matrix<double> ATA { get; set; }
 		public Matrix<double> ATb { get; set; }
 		public Matrix<double> W { get; set; }
-		public Matrix<double> inv { get; set; }
+		public Matrix<double> Inv { get; set; }
 
 		// constructor
 		public RidgeRegression(int n, double penalty = 10e-5) 
@@ -37,8 +37,8 @@ namespace GazeCalibration
 			this.W = new Matrix<double>(n, 1);
 			W.SetZero();
 
-			this.inv = new Matrix<double>(n, n);
-			inv.SetZero();
+			this.Inv = new Matrix<double>(n, n);
+			Inv.SetZero();
 		}
 		public RidgeRegression() { }
 
@@ -84,8 +84,8 @@ namespace GazeCalibration
 		}
 		public void UpdateWeights()
 		{
-			CvInvoke.Invert(ATA, inv, DecompMethod.Cholesky);
-			this.W = inv * ATb;
+			CvInvoke.Invert(ATA, Inv, DecompMethod.Cholesky);
+			this.W = Inv * ATb;
 		}
 
 		public double Predict(Matrix<double> feature) 

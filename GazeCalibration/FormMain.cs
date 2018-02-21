@@ -27,6 +27,7 @@ namespace GazeCalibration
 			[Category("Eye Detection")] public int EyeDection_MinNeighbors { get; set; } = 10;
 			[Category("Eye Detection")] public int EyeDection_MinSize { get; set; } = 40;
 
+			[Category("Pupil Detection")] public bool EnablePupilDection { get; set; } = false;
 			[Category("Pupil Detection")] public double PupilDection_ScaleFactor { get; set; } = 1.1;
 			[Category("Pupil Detection")] public int PupilDection_MinScale { get; set; } = 10;
 			[Category("Pupil Detection")] public int PupilDection_OffsetFactor { get; set; } = 4;
@@ -67,11 +68,15 @@ namespace GazeCalibration
 		CascadeClassifier faceClassifier = null;
 		CascadeClassifier eyeClassifier = null;
 
+		// local caches 
+		Mat _concatedFeature = new Mat();
+		Mat _concatedFeatureDouble = new Mat();
+		Mat _scaledDown = new Mat();
+		Mat _scaledUp = new Mat();
+
 		// public Properties for calibration
 		public RidgeRegression RegressionX { get; private set; } = null;
 		public RidgeRegression RegressionY { get; private set; } = null;
-
-		// private fields for selection test
 
 		// constructor
 		public FormMain()
@@ -85,6 +90,9 @@ namespace GazeCalibration
 			int n = (settings.FeatureExtraction_PatchWidth * settings.FeatureExtraction_PatchHeight) * 2 + 5;
 			RegressionX = new RidgeRegression(n);
 			RegressionY = new RidgeRegression(n);
+
+			faceClassifier = new CascadeClassifier(faceFileName);
+			eyeClassifier = new CascadeClassifier(eyeFileName);
 		}
 
 		// control event handlers
@@ -231,11 +239,10 @@ namespace GazeCalibration
 			if (isDetectionOkay)
 			{
 				// merge two feature vectors to one row vector
-				Mat concatedFeature = new Mat();
-				CvInvoke.HConcat(features[0], features[1], concatedFeature);
+				CvInvoke.HConcat(features[0], features[1], _concatedFeature);
 
 				// convert it into double type
-				concatedFeature.ConvertTo(concatedFeature, DepthType.Cv64F);
+				_concatedFeature.ConvertTo(_concatedFeatureDouble, DepthType.Cv64F);
 
 				// convert it into double matrix and add padding values for constant term
 				Point e1 = eyes[0].Center();
@@ -254,8 +261,8 @@ namespace GazeCalibration
 							}
 					}
 				);
-				Matrix<double> featureVector = new Matrix<double>(concatedFeature.Rows, concatedFeature.Cols + 5);
-				CvInvoke.HConcat(concatedFeature, padding, featureVector);
+				Matrix<double> featureVector = new Matrix<double>(_concatedFeature.Rows, _concatedFeature.Cols + 5);
+				CvInvoke.HConcat(_concatedFeatureDouble, padding, featureVector);
 
 				// also compute the predict value using current regression models
 				int x = (int)RegressionX.Predict(featureVector);
@@ -286,10 +293,6 @@ namespace GazeCalibration
 			this.pupils.Clear();
 			this.features.Clear();
 
-			// load classifier if not done yet
-			if (this.faceClassifier == null) faceClassifier = new CascadeClassifier(faceFileName);
-			if (this.eyeClassifier == null) eyeClassifier = new CascadeClassifier(eyeFileName);
-
 			// preprocess input frame - convert to gray scale and equalize histogram 
 			CvInvoke.CvtColor(frame, processedFrame, Emgu.CV.CvEnum.ColorConversion.Bgr2Gray);
 			CvInvoke.EqualizeHist(processedFrame, processedFrame);
@@ -315,7 +318,8 @@ namespace GazeCalibration
 						faceRegion,
 						this.settings.EyeDection_ScaleFactor,
 						this.settings.EyeDection_MinNeighbors,
-						new Size(this.settings.EyeDection_MinSize, this.settings.EyeDection_MinSize));
+						new Size(this.settings.EyeDection_MinSize, this.settings.EyeDection_MinSize)
+						);
 
 					// make sure the left eye has index 0, right eye has index 1
 					if (eyesDetected.Count() == 2)
@@ -345,9 +349,12 @@ namespace GazeCalibration
 				Mat eye_subimage = new Mat(processedFrame, eye);
 
 				// detect and record pupil box
-				Rectangle pupil = FindPupil(eye_subimage);
-				pupil.Offset(eye.X, eye.Y);
-				pupils.Add(pupil);
+				if (settings.EnablePupilDection)
+				{
+					Rectangle pupil = FindPupil(eye_subimage);
+					pupil.Offset(eye.X, eye.Y);
+					pupils.Add(pupil);
+				}
 
 				// detect and record feature vector
 				Mat feature = ComputeFeature(eye_subimage);
@@ -363,17 +370,18 @@ namespace GazeCalibration
 			}
 
 			// display detected boxes
+			var color = new Bgr(Color.Red).MCvScalar;
 			if (this.settings.ShowFaceBox)
 				foreach (Rectangle face in faces)
-					CvInvoke.Rectangle(frame, face, new Bgr(Color.Red).MCvScalar, 2);
+					CvInvoke.Rectangle(frame, face, color, 2);
 
 			if (this.settings.ShowEyeBox)
 				foreach (Rectangle eye in eyes)
-					CvInvoke.Rectangle(frame, eye, new Bgr(Color.Red).MCvScalar, 2);
+					CvInvoke.Rectangle(frame, eye, color, 2);
 
 			if (this.settings.ShowPupilBox)
 				foreach (Rectangle pupil in pupils)
-					CvInvoke.Rectangle(frame, pupil, new Bgr(Color.Red).MCvScalar, 1);
+					CvInvoke.Rectangle(frame, pupil, color, 1);
 		}
 		private Rectangle FindPupil(Mat image)
 		{
@@ -459,19 +467,16 @@ namespace GazeCalibration
 			int y = (image.Size.Height - h) / 2;
 			Mat chopped = new Mat(image, new Rectangle(x, y, w, h));
 
-			// scale the chopped region to patch size, then equalize its histogram 
-			Mat scaledDown = new Mat();
-			CvInvoke.Resize(chopped, scaledDown, new Size(patchWidth, patchHeight), 0, 0, Inter.Area);
+			// scale the chopped region to patch size, then equalize its histogram
+			CvInvoke.Resize(chopped, _scaledDown, new Size(patchWidth, patchHeight), 0, 0, Inter.Area);
 			//CvInvoke.EqualizeHist(scaledDown, scaledDown);
 
 			// scale up and copy to the original eye patch
-			Mat scaledUp = new Mat();
-			CvInvoke.Resize(scaledDown, scaledUp, chopped.Size, 0, 0, Inter.Nearest);
-			scaledUp.CopyTo(chopped);
+			CvInvoke.Resize(_scaledDown, _scaledUp, chopped.Size, 0, 0, Inter.Nearest);
+			_scaledUp.CopyTo(chopped);
 
 			// return the flatted 1D Mat feature
-			scaledDown = scaledDown.Reshape(1, 1);
-			return scaledDown;
+			return _scaledDown.Reshape(1, 1);
 		}
 
 		// helper methods
@@ -518,7 +523,6 @@ namespace GazeCalibration
 			RegressionX = models[0];
 			RegressionY = models[1];
 		}
-
 	}
 
 	// helper extension class for Rectangle struct
@@ -552,21 +556,11 @@ namespace GazeCalibration
 			float dy = p1.Y - p2.Y;
 			return Math.Sqrt(dx * dx + dy * dy);
 		}
-		public static PointF Multiply(this Point p, float f)
+		public static double DistanceFrom(this PointF p1, PointF p2)
 		{
-			return new PointF(p.X * f, p.Y * f);
-		}
-		public static PointF Add(this Point p1, PointF p2)
-		{
-			return new PointF(p1.X + p2.X, p1.Y + p2.Y);
-		}
-		public static PointF Multiply(this PointF p, float f)
-		{
-			return new PointF(p.X * f, p.Y * f);
-		}
-		public static PointF Add(this PointF p1, PointF p2)
-		{
-			return new PointF(p1.X + p2.X, p1.Y + p2.Y);
+			float dx = p1.X - p2.X;
+			float dy = p1.Y - p2.Y;
+			return Math.Sqrt(dx * dx + dy * dy);
 		}
 
 		public static int LimitToRange(this int value, int inclusiveMinimum, int inclusiveMaximum)
@@ -581,5 +575,15 @@ namespace GazeCalibration
 			if (value > inclusiveMaximum) { return inclusiveMaximum; }
 			return value;
 		}
+
+		public static float MapTo(this float x, float in_min, float in_max, float out_min, float out_max)
+		{
+			return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+		}
+		public static double MapTo(this double x, double in_min, double in_max, double out_min, double out_max)
+		{
+			return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+		}
 	}
+
 } 

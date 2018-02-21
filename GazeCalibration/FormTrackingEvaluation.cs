@@ -18,33 +18,40 @@ namespace GazeCalibration
 	public partial class FormTrackingEvaluation : Form
 	{
 		// public setting class
-		public class Settings
+		class Settings
 		{
-			public int NumOfGazePositions { get; set; } = 10;
-			public float AverageDecayRatio { get; set; } = 0.8f;
-			public int GazeLostTime { get; set; } = 500;
 			public bool UpdateTrackingModel { get; set; } = true;
 			public int TargetRadius { get; set; } = 20;
 			public Color TargetColor { get; set; } = Color.Green;
 			public Color TargetColor2 { get; set; } = Color.Red;
 			public float[] GridLinePositions { get; set; } = { 0.05f, 0.2f, 0.4f, 0.6f, 0.8f, 0.95f };
+
+			[Category("Fixation")] [TypeConverter(typeof(ExpandableObjectConverter))]
+			public FixationDetector FixationDetector { get; set; }
 		}
-		
+
 		// private enum
 		enum GazeDisplayMode { None, Individal, Average };
 
 		// private field 
 		Settings settings = new Settings();
 		FormMain formMain = null;
-		Queue<(Point, Matrix<double>, long)> lastGazePositions = new Queue<(Point, Matrix<double>,long)>();
+
+		// private fields for fixation detection
+		FixationDetector fixationDetector = new FixationDetector();
+		GazeDisplayMode gazeDisplayMode = GazeDisplayMode.Individal;
+
+		/*
+		Queue<(Point gazePosition, Matrix<double> feature, long time)> 
+			lastGazePositions = new Queue<(Point, Matrix<double>,long)>();
+		Vector averagedGazePosition;
+		Stopwatch stopwatch = new Stopwatch();
+		*/
 		List<Point> testPoints;
 		Point currentTestPoint;
-		PointF averagedGazePosition;
-		GazeDisplayMode gazeDisplayMode = GazeDisplayMode.Individal;
 		bool isTestStarted = false;
-		bool isFirstGazeUpdate = true;
-		Stopwatch stopwatch = new Stopwatch();
-		List<(Point, Point, long)> trackTrialRecords = new List<(Point, Point, long)>();
+		List<(Point testPoint, Point gazePosition, long timeGap)>
+			trackTrialRecords = new List<(Point, Point, long)>();
 
 		// constructor
 		public FormTrackingEvaluation(FormMain f)
@@ -52,12 +59,16 @@ namespace GazeCalibration
 			InitializeComponent();
 
 			this.formMain = f;
+
+			this.settings.FixationDetector = this.fixationDetector;
 		}
 
 		// event handlers
 		private void FormTrackingEvaluation_Load(object sender, EventArgs e)
 		{
 			this.formMain.GazeUpdated += FormMain_GazeUpdated;
+
+			this.fixationDetector.RemoveGazePosition += delegate { this.Invalidate(); };
 		}
 		private void FormTrackingEvaluation_FormClosing(object sender, FormClosingEventArgs e)
 		{
@@ -72,7 +83,7 @@ namespace GazeCalibration
 			g.Clear(SystemColors.Control);
 
 			// draw current test position
-			using (Pen b = lastGazePositions.Count > 0 ? new Pen(settings.TargetColor,2) : new Pen(settings.TargetColor2,2))
+			using (Pen b = fixationDetector.LastGazePositions.Count > 0 ? new Pen(settings.TargetColor,2) : new Pen(settings.TargetColor2,2))
 			{
 				float centerX = currentTestPoint.X;
 				float centerY = currentTestPoint.Y;
@@ -90,9 +101,9 @@ namespace GazeCalibration
 			if (gazeDisplayMode == GazeDisplayMode.Individal)
 			{
 				// draw recent gaze predictions
-				foreach (var pair in lastGazePositions)
+				foreach (var pair in fixationDetector.LastGazePositions)
 				{
-					Point p = pair.Item1;
+					Point p = pair.gazePosition;
 					// make sure drawing point within window
 					int x = p.X.LimitToRange(0, w - 1);
 					int y = p.Y.LimitToRange(0, h - 1);
@@ -104,8 +115,9 @@ namespace GazeCalibration
 			if (gazeDisplayMode == GazeDisplayMode.Average)
 			{
 				// make sure drawing point within window
-				float x = averagedGazePosition.X.LimitToRange(0, w - 1);
-				float y = averagedGazePosition.Y.LimitToRange(0, h - 1);
+				Vector p = fixationDetector.AveragedGazePosition;
+				float x = p.X.LimitToRange(0, w - 1);
+				float y = p.Y.LimitToRange(0, h - 1);
 				g.DrawLine(Pens.Red, x - r, y, x + r, y);
 				g.DrawLine(Pens.Red, x, y - r, x, y + r);
 			}
@@ -162,35 +174,10 @@ namespace GazeCalibration
 		}
 
 		// gaze update handler
-		private async void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
+		private void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
 		{
-			// add new gaze position to queue
-			lastGazePositions.Enqueue((e.PredictedGaze, e.EyeFeature, this.stopwatch.ElapsedMilliseconds));
+			fixationDetector.AddGazePosition(e.PredictedGaze, e.EyeFeature);
 
-			// compute the averaged gaze position
-			if (isFirstGazeUpdate)
-			{
-				averagedGazePosition = e.PredictedGaze;
-				isFirstGazeUpdate = false;
-			}
-			else
-			{
-				averagedGazePosition = 
-					averagedGazePosition
-					.Multiply(settings.AverageDecayRatio)
-					.Add(
-						e.PredictedGaze.Multiply(1.0f - settings.AverageDecayRatio)
-					);
-			}
-
-			// remember to request redrawing
-			this.Invalidate();
-
-			// schedule to remove feature after specified time 
-			await Task.Delay(settings.GazeLostTime);
-			this.lastGazePositions.Dequeue();
-
-			// remember to request redrawing
 			this.Invalidate();
 		}
 
@@ -227,14 +214,14 @@ namespace GazeCalibration
 		}
 		private void FinishedTrial()
 		{
-			long currentTime = stopwatch.ElapsedMilliseconds;
+			long currentTime = fixationDetector.ElapsedMilliseconds;
 
 			// record trial results
 			// and add new samples to regression models
-			foreach (var tuple in this.lastGazePositions)
+			foreach (var tuple in fixationDetector.LastGazePositions)
 			{
-				Point gazePosition = tuple.Item1;
-				long timeGap = currentTime - tuple.Item3;
+				Point gazePosition = tuple.gazePosition;
+				long timeGap = currentTime - tuple.time;
 				
 				// record trial result
 				this.trackTrialRecords.Add((currentTestPoint, gazePosition, timeGap));
@@ -244,8 +231,8 @@ namespace GazeCalibration
 				{
 					// update regression tracking models
 					// without update weights
-					formMain.RegressionX.AddFeature(tuple.Item2, currentTestPoint.X, false);
-					formMain.RegressionY.AddFeature(tuple.Item2, currentTestPoint.Y, false);
+					formMain.RegressionX.AddFeature(tuple.feature, currentTestPoint.X, false);
+					formMain.RegressionY.AddFeature(tuple.feature, currentTestPoint.Y, false);
 				}
 			}
 
@@ -257,8 +244,6 @@ namespace GazeCalibration
 		{
 			this.labelStartText.Visible = false;
 			this.isTestStarted = true;
-
-			this.stopwatch.Start();
 
 			GenerateTestPositions();
 
@@ -282,8 +267,8 @@ namespace GazeCalibration
 				{
 					foreach (var pair in trackTrialRecords)
 					{
-						Point testPoint = pair.Item1;
-						Point gazePosition = pair.Item2;
+						Point testPoint = pair.testPoint;
+						Point gazePosition = pair.gazePosition;
 						writetext.WriteLine(testPoint.X + "," + testPoint.Y + "," + gazePosition.X + "," + gazePosition.Y);
 					}
 				}
@@ -292,6 +277,5 @@ namespace GazeCalibration
 			// clos the window
 			this.Close();
 		}
-
 	}
 }

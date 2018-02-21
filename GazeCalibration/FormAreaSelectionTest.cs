@@ -11,18 +11,14 @@ using System.Diagnostics;
 using Emgu.CV;
 using Emgu.CV.Structure;
 using Emgu.CV.CvEnum;
+using System.Threading;
 
 namespace GazeCalibration
 {
 	public partial class FormAreaSelectionTest : Form
 	{
-		public class Settings
+		class Settings
 		{
-			[Category("Gaze Tracking")] public int NumOfGazePositions { get; set; } = 10;
-			[Category("Gaze Tracking")] public float AverageDecayRatio { get; set; } = 0.7f;
-			[Category("Gaze Tracking")] public int GazeLostTime { get; set; } = 500; // ms
-			[Category("Gaze Tracking")] public bool UpdateTrackingModel { get; set; } = true;
-
 			[Category("Test")] public int NumOfTrials { get; set; } = 30;
 			[Category("Test")] public int MinTrialDistance { get; set; } = 300;
 
@@ -30,19 +26,22 @@ namespace GazeCalibration
 			[Category("Target")] public int TargetRadius { get; set; } = 6; // pixels
 			[Category("Target")] public Color TargetColor { get; set; } = Color.LimeGreen;
 			[Category("Target")] public Color TargetColor2 { get; set; } = Color.Red;
+			[Category("Target")] public Color TargetColor3 { get; set; } = Color.Orange;
 			[Category("Target")] public int MinDistance { get; set; } = 10; // pixels
+			[Category("Target")] public double SliverTriangleThreshold { get; set; } = Math.PI / 4; // radian
+			[Category("Target")] public bool ShowTargetAdjacency { get; set; } = false;
 
-			[Category("Gaze Region")] public int RegionLockTime { get; set; } = 300; // ms
-			[Category("Gaze Region")] public int RegionLockSpeed { get; set; } = 100; // pixels
-			[Category("Gaze Region")] public int RegionRadius { get; set; } = 100; // pixels
+			[Category("Fixation")] public bool ShowFixationRegion { get; set; } = false;
+			[Category("Fixation")] [TypeConverter(typeof(ExpandableObjectConverter))] public FixationDetector FixationDetector { get; set; }
+			
+			[Category("Local Selection Region")] public int LocalSelectionRegionRadius { get; set; } = 150;
 		}
 
 		class Target
 		{
 			public Point Position { get; set; }
-			public bool isSelected { get; set; } = false;
+			public bool IsSelected { get; set; } = false;
 			public List<Target> AdjacentTargets { get; private set; } = new List<Target>();
-			public float focusValue { get; set; } = 0f;
 
 			public Target(Point pos)
 			{
@@ -52,23 +51,32 @@ namespace GazeCalibration
 
 		// private enum
 		enum GazeDisplayMode { None, Individal, Average };
+		enum SelectionMethod { MouseWheel, MouseMovement };
 
 		// private fields
 		Random rand = new Random();
 		Settings settings = new Settings();
 		FormMain formMain = null;
+		SelectionMethod selectionMethod = SelectionMethod.MouseMovement;
+
+		// private fields for selection task
 		bool isTestStarted = false;
-		bool isFirstGazeUpdate = true;
-		bool isGazeLost = false;
+		int trialCount;
 		List<Target> targets = new List<Target>();
 		Target goalTarget = null;
 		Target currentTarget = null;
-		int trialCount;
-		Queue<(Point, Matrix<double>, long)> lastGazePositions = new Queue<(Point, Matrix<double>, long)>();
-		PointF averagedGazePosition;
-		Stopwatch stopwatch = new Stopwatch();
+		Vector localSelectionRegionCenter;
+		List<Target> localTargets = new List<Target>();
+		int localSelectionIndex;
+		Vector mouseDisplacement;
+
+		// private fields for fixation detection
+		FixationDetector fixationDetector = new FixationDetector();
 		GazeDisplayMode gazeDisplayMode = GazeDisplayMode.Individal;
+
+		// private fields for virtual gaze simulation
 		int mouseX, mouseY;
+		int lastMouseX, lastMouseY;
 
 		// constructor
 		public FormAreaSelectionTest(FormMain f)
@@ -76,18 +84,24 @@ namespace GazeCalibration
 			InitializeComponent();
 
 			this.formMain = f;
+
+			this.settings.FixationDetector = this.fixationDetector;
 		}
 
 		// event handlers
 		private void FormAreaSelectionTest_Load(object sender, EventArgs e)
 		{
 			this.formMain.GazeUpdated += FormMain_GazeUpdated;
-		}
-		private void labelStartText_Click(object sender, EventArgs e)
-		{
-			this.labelStartText.Visible = false;
 
-			StartTest();
+			this.MouseWheel += FormAreaSelectionTest_MouseWheel;
+
+			this.fixationDetector.RemoveGazePosition += delegate { this.Invalidate(); };
+			this.fixationDetector.FixationLocked += FixationDetector_FixationLocked;
+			this.fixationDetector.FixationReleased += FixationDetector_FixationReleased;
+		}
+		private void FormAreaSelectionTest_FormClosed(object sender, FormClosedEventArgs e)
+		{
+			this.formMain.GazeUpdated -= FormMain_GazeUpdated;
 		}
 		private void FormAreaSelectionTest_Paint(object sender, PaintEventArgs e)
 		{
@@ -99,75 +113,13 @@ namespace GazeCalibration
 			// clear window
 			g.Clear(SystemColors.Control);
 
-			// draw all targets
-			float radius = settings.TargetRadius;
-			float size = radius + radius;
-			using (Brush b = new SolidBrush(settings.TargetColor))
-			{
-				foreach (Target p in targets)
-				{
-					if (p == goalTarget) continue;
+			DrawFixation(g);
 
-					float x = p.Position.X;
-					float y = p.Position.Y;
+			if(settings.ShowTargetAdjacency) DrawTargetAdjacency(g);
 
-					float s = size + 4 * p.focusValue;
-					g.FillEllipse(Brushes.Gray, x - radius - 2 * p.focusValue, y - radius - 2 * p.focusValue, s, s);
+			DrawTargets(g);
 
-					if (p.focusValue < 4)
-						g.FillEllipse(b, x - radius, y - radius, size, size);
-					else
-						g.FillEllipse(Brushes.Red, x - radius, y - radius, size, size);
-				}
-			}
-
-			// draw goal target
-			using (Brush b = new SolidBrush(settings.TargetColor2))
-			{
-				float x = goalTarget.Position.X;
-				float y = goalTarget.Position.Y;
-				g.FillEllipse(b, x - radius, y - radius, size, size);
-
-			}
-
-			int h = this.ClientSize.Height;
-			int w = this.ClientSize.Width;
-			int r = 5;
-
-			if (gazeDisplayMode == GazeDisplayMode.Individal)
-			{
-				// draw recent gaze predictions
-				foreach (var pair in lastGazePositions)
-				{
-					Point p = pair.Item1;
-					// make sure drawing point within window
-					int x = p.X.LimitToRange(0, w - 1);
-					int y = p.Y.LimitToRange(0, h - 1);
-					g.DrawLine(Pens.Red, x - r, y, x + r, y);
-					g.DrawLine(Pens.Red, x, y - r, x, y + r);
-				}
-			}
-
-			if (gazeDisplayMode == GazeDisplayMode.Average)
-			{
-				// make sure drawing point within window
-				float x = averagedGazePosition.X.LimitToRange(0, w - 1);
-				float y = averagedGazePosition.Y.LimitToRange(0, h - 1);
-				g.DrawLine(Pens.Red, x - r, y, x + r, y);
-				g.DrawLine(Pens.Red, x, y - r, x, y + r);
-			}
-		}
-		private void FormAreaSelectionTest_MouseDown(object sender, MouseEventArgs e)
-		{
-			if (e.Button == MouseButtons.Left)
-			{
-				FinishTrial();
-			}
-
-			else if (e.Button == MouseButtons.Right)
-			{
-				
-			}
+			DrawGazePosition(g);
 		}
 		private void FormAreaSelectionTest_KeyDown(object sender, KeyEventArgs e)
 		{
@@ -203,10 +155,62 @@ namespace GazeCalibration
 
 			}
 		}
-		private void timerGazeLost_Tick(object sender, EventArgs e)
+		private void FormAreaSelectionTest_MouseDown(object sender, MouseEventArgs e)
 		{
-			this.timerGazeLost.Stop();
-			this.isGazeLost = true;
+			if (e.Button == MouseButtons.Left)
+			{
+				FinishTrial();
+			}
+
+			else if (e.Button == MouseButtons.Right)
+			{
+				// nothing to preform yet
+			}
+		}
+		private void FormAreaSelectionTest_MouseMove(object sender, MouseEventArgs e)
+		{
+			if (this.selectionMethod == SelectionMethod.MouseMovement &&
+				fixationDetector.FixationState == FixationState.Locked)
+			{
+				int dx = mouseX - lastMouseX;
+				int dy = mouseY - lastMouseY;
+				AddDragging(dx, dy);
+			}
+
+			this.lastMouseX = mouseX;
+			this.lastMouseY = mouseY;
+			this.mouseX = e.X;
+			this.mouseY = e.Y;
+		}
+		private void FormAreaSelectionTest_MouseWheel(object sender, MouseEventArgs e)
+		{
+			if (fixationDetector.FixationState != FixationState.Locked) return;
+			if (this.selectionMethod != SelectionMethod.MouseWheel) return;
+
+			if (e.Delta < 0)
+			{
+				localSelectionIndex++;
+			}
+			else if (e.Delta > 0)
+			{
+				localSelectionIndex += this.localTargets.Count - 1;
+			}
+			localSelectionIndex %= this.localTargets.Count;
+
+			this.currentTarget = localTargets.ElementAt(localSelectionIndex);
+		}
+		private void labelStartText_Click(object sender, EventArgs e)
+		{
+			this.labelStartText.Visible = false;
+
+			StartTest();
+		}
+		private void timerVirtualGazeTimer_Tick(object sender, EventArgs e)
+		{
+			// add new gaze position to queue
+			Point p = new Point(mouseX + rand.Next(-100, 100), mouseY + rand.Next(-100, 100));
+
+			fixationDetector.AddGazePosition(p, null);
 
 			this.Invalidate();
 		}
@@ -214,43 +218,20 @@ namespace GazeCalibration
 		// gaze update handler
 		private void FormMain_GazeUpdated(object o, FormMain.GazeEventArgs e)
 		{
-			// add new gaze position to queue
-			lastGazePositions.Enqueue((e.PredictedGaze, e.EyeFeature, this.stopwatch.ElapsedMilliseconds));
+			fixationDetector.AddGazePosition(e.PredictedGaze, e.EyeFeature);
 
-			// remove oldest position if more than the given number
-			while (lastGazePositions.Count > settings.NumOfGazePositions)
-			{
-				lastGazePositions.Dequeue();
-			}
-
-			// compute the averaged gaze position
-			if (isFirstGazeUpdate)
-			{
-				averagedGazePosition = e.PredictedGaze;
-				isFirstGazeUpdate = false;
-			}
-			else
-			{
-				averagedGazePosition =
-					averagedGazePosition
-					.Multiply(settings.AverageDecayRatio)
-					.Add(
-						e.PredictedGaze.Multiply(1.0f - settings.AverageDecayRatio)
-					);
-			}
-
-			// set timer and gaze lost flag
-			this.timerGazeLost.Stop();
-			this.timerGazeLost.Interval = settings.GazeLostTime;
-			this.timerGazeLost.Start();
-			this.isGazeLost = false;
-
-			// remember to request redrawing
 			this.Invalidate();
 		}
+		private void FixationDetector_FixationLocked(object sender, EventArgs e)
+		{
+			PrepareLocalTargets();
+		}
+		private void FixationDetector_FixationReleased(object sender, EventArgs e)
+		{
+			// nothing to preform yet
+		}
 
-
-		// main procideures
+		// main procideures for selection tasks
 		private void GenerateTargets()
 		{
 			targets.Clear();
@@ -280,14 +261,52 @@ namespace GazeCalibration
 
 				targets.Add(new Target(pos));
 			}
+
+			FindTargetAdjacency();
+		}
+		private void FindTargetAdjacency()
+		{
+			// create Delaunay triangulation
+			var triangulation = new DelaunayTriangulation(0, ClientSize.Width, 0, ClientSize.Height);
+			foreach (Target t in targets)
+			{
+				triangulation.AddVertex(t.Position.X, t.Position.Y, t);
+			}
+			triangulation.RemoveBoundingBox(); // we do not need bounding vertices
+
+			// generate target adjacency information
+			foreach (var f in triangulation.Faces.Values)
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					int j = (i + 1) % 3;
+					Target t1 = f.Vertices[i].Tag as Target;
+					Target t2 = f.Vertices[j].Tag as Target;
+					if (!t1.AdjacentTargets.Contains(t2)) t1.AdjacentTargets.Add(t2);
+					if (!t2.AdjacentTargets.Contains(t1)) t2.AdjacentTargets.Add(t1);
+				}
+			}
+
+			// remove linkages when it is at sliver triangle
+			foreach (var f in triangulation.Faces.Values)
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					int j = (i + 1) % 3;
+					if (f.Angles[i] + f.Angles[j] > settings.SliverTriangleThreshold) continue;
+
+					Target t1 = f.Vertices[i].Tag as Target;
+					Target t2 = f.Vertices[j].Tag as Target;
+					t1.AdjacentTargets.Remove(t2);
+					t2.AdjacentTargets.Remove(t1);
+				}
+			}
 		}
 		private void StartTest()
 		{
 			isTestStarted = true;
 			trialCount = 0;
 		
-			stopwatch.Start();
-
 			GenerateTargets();
 
 			StartTrial();
@@ -318,59 +337,158 @@ namespace GazeCalibration
 			}
 		}
 
-		private void timerVirtualGazeTimer_Tick(object sender, EventArgs e)
+		// drawing procedures
+		private void DrawFixation(Graphics g)
 		{
-			// add new gaze position to queue
-			Point p = new Point(mouseX + rand.Next(-100, 100), mouseY + rand.Next(-100, 100));
-			lastGazePositions.Enqueue((p, null, this.stopwatch.ElapsedMilliseconds));
-
-			// remove oldest position if more than the given number
-			while (lastGazePositions.Count > settings.NumOfGazePositions)
+			if (fixationDetector.FixationState == FixationState.Locked)
 			{
-				lastGazePositions.Dequeue();
+				int r = settings.LocalSelectionRegionRadius;
+				g.FillEllipse(Brushes.MistyRose,
+					(float)(localSelectionRegionCenter.X - r),
+					(float)(localSelectionRegionCenter.Y - r),
+					(float)(r + r),
+					(float)(r + r));
 			}
 
-			// compute the averaged gaze position
-			if (isFirstGazeUpdate)
+			// draw fixation region
+			if (settings.ShowFixationRegion)
 			{
-				averagedGazePosition = p;
-				isFirstGazeUpdate = false;
+				double r = fixationDetector.FixationRegionRadius;
+				PointF p = fixationDetector.AveragedGazePosition;
+				g.FillEllipse(Brushes.LightGray, 
+					(float)(p.X - r),
+					(float)(p.Y - r),
+					(float)(r + r),
+					(float)(r + r));
 			}
-			else
+		}
+		private void DrawTargets(Graphics g)
+		{
+			// draw all targets
+			float radius = settings.TargetRadius;
+			float size = radius + radius;
+			using (Brush b = new SolidBrush(settings.TargetColor))
 			{
-				averagedGazePosition =
-					averagedGazePosition
-					.Multiply(settings.AverageDecayRatio)
-					.Add(
-						p.Multiply(1.0f - settings.AverageDecayRatio)
-					);
-			}
+				foreach (Target p in targets)
+				{
+					if (p == goalTarget) continue;
 
-			// set timer and gaze lost flag
-			this.timerGazeLost.Stop();
-			this.timerGazeLost.Interval = settings.GazeLostTime;
-			this.timerGazeLost.Start();
-			this.isGazeLost = false;
+					float x = p.Position.X;
+					float y = p.Position.Y;
 
-			foreach (Target t in targets)
-			{
-				double dis = p.DistanceFrom(t.Position);
-				double focus = Math.Max(1 - (dis / 200), 0);
-				t.focusValue *= 0.8f;
-				t.focusValue += (float)focus;
-
-				//if (currentTarget == null &&
-				//	t.focusValue > )
+					g.FillEllipse(b, x - radius, y - radius, size, size);
+				}
 			}
 
-			// remember to request redrawing
-			this.Invalidate();
+			// draw goal target
+			if (goalTarget != null)
+				using (Brush b = new SolidBrush(settings.TargetColor2))
+				{
+					float x = goalTarget.Position.X;
+					float y = goalTarget.Position.Y;
+					g.FillEllipse(b, x - radius, y - radius, size, size);
+
+				}
+
+			// draw current target
+			if (fixationDetector.FixationState == FixationState.Locked && currentTarget != null)
+				using (Brush b = new SolidBrush(settings.TargetColor3))
+				{
+					float x = currentTarget.Position.X;
+					float y = currentTarget.Position.Y;
+					g.FillEllipse(b, x - radius, y - radius, size, size);
+
+				}
+		}
+		private void DrawGazePosition(Graphics g)
+		{
+			int h = this.ClientSize.Height;
+			int w = this.ClientSize.Width;
+
+			if (gazeDisplayMode == GazeDisplayMode.Individal)
+			{
+				int r = 5;
+				// draw recent gaze predictions
+				foreach (var pair in fixationDetector.LastGazePositions)
+				{
+					Point p = pair.gazePosition;
+					// make sure drawing point within window
+					int x = p.X.LimitToRange(0, w - 1);
+					int y = p.Y.LimitToRange(0, h - 1);
+					g.DrawLine(Pens.Red, x - r, y, x + r, y);
+					g.DrawLine(Pens.Red, x, y - r, x, y + r);
+				}
+			}
+			else if (gazeDisplayMode == GazeDisplayMode.Average)
+			{
+				int r = 5;
+				PointF p = fixationDetector.AveragedGazePosition;
+				// make sure drawing point within window
+				float x = p.X.LimitToRange(0, w - 1);
+				float y = p.Y.LimitToRange(0, h - 1);
+				g.DrawLine(Pens.Red, x - r, y, x + r, y);
+				g.DrawLine(Pens.Red, x, y - r, x, y + r);
+			}
+		}
+		private void DrawTargetAdjacency(Graphics g)
+		{
+			foreach (Target t1 in targets)
+			{
+				foreach (Target t2 in t1.AdjacentTargets)
+				{
+					g.DrawLine(Pens.Gray, t1.Position.X, t1.Position.Y, t2.Position.X, t2.Position.Y);
+				}
+			}
 		}
 
-		private void FormAreaSelectionTest_MouseMove(object sender, MouseEventArgs e)
+		// functions for supporting target selection
+		private void PrepareLocalTargets()
 		{
-			this.mouseX = e.X;
-			this.mouseY = e.Y;
+			// set local region center as current average gaze position
+			PointF center = this.fixationDetector.AveragedGazePosition;
+
+			// collect local targets within in region, ordered by Y coordinates
+			var selectedTargets = targets
+				.Where(t => center.DistanceFrom(t.Position) < settings.LocalSelectionRegionRadius)
+				.OrderBy(t => t.Position.Y);
+
+			// find the closest target and its index
+			var (minTarget, minIndex, _) = selectedTargets
+				.Select((t, i) => (t, i, d: center.DistanceFrom(t.Position)))
+				.Aggregate((min, next) => min.d < next.d ? min : next);
+
+			this.localSelectionRegionCenter = center;
+			this.localTargets = selectedTargets.ToList();
+			this.localSelectionIndex = minIndex;
+			this.currentTarget = minTarget;
+			this.mouseDisplacement = new Point(0, 0);
+		}
+		private void AddDragging(int dx, int dy)
+		{
+			// add to overall displcaement vector
+			mouseDisplacement += new Vector(dx, dy);
+
+			// if overall displacement excesses specified threshold
+			if (mouseDisplacement.Norm > 20)
+			{
+				// find the adjacent target in the direction closest to the displacement vector
+				PointF u = mouseDisplacement.Normalize();
+				(Target maxTarget, float maxDot) = currentTarget.AdjacentTargets
+					.Select(t => (t, dot: ((Vector)(t.Position) - currentTarget.Position).Normalize().Dot(u)))
+					.Aggregate((max, next) => max.dot > next.dot ? max : next);
+				
+				// reset the displacement vector
+				mouseDisplacement = new Vector(0, 0);
+
+				// move to the found adjacent target only if dot product greater than given threshold
+				if (maxDot > 0.2f)
+				{
+					this.currentTarget = maxTarget;
+
+					// remember to request window redraw
+					this.Invalidate();
+				}
+			}
 		}
 	}
 }

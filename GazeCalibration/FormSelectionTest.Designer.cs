@@ -28,7 +28,10 @@
 		/// </summary>
 		private void InitializeComponent()
 		{
+			this.components = new System.ComponentModel.Container();
 			this.labelStartText = new System.Windows.Forms.Label();
+			this.TimerVirtualGaze = new System.Windows.Forms.Timer(this.components);
+			this.label1 = new System.Windows.Forms.Label();
 			this.SuspendLayout();
 			// 
 			// labelStartText
@@ -43,25 +46,44 @@
 			this.labelStartText.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			this.labelStartText.Click += new System.EventHandler(this.labelStartText_Click);
 			// 
+			// TimerVirtualGaze
+			// 
+			this.TimerVirtualGaze.Interval = 50;
+			this.TimerVirtualGaze.Tick += new System.EventHandler(this.TimerVirtualGaze_Tick);
+			// 
+			// label1
+			// 
+			this.label1.AutoSize = true;
+			this.label1.Location = new System.Drawing.Point(12, 9);
+			this.label1.Name = "label1";
+			this.label1.Size = new System.Drawing.Size(51, 20);
+			this.label1.TabIndex = 1;
+			this.label1.Text = "label1";
+			// 
 			// FormSelectionTest
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(704, 448);
+			this.Controls.Add(this.label1);
 			this.Controls.Add(this.labelStartText);
 			this.DoubleBuffered = true;
 			this.Name = "FormSelectionTest";
 			this.Text = "FormSelectionTest";
 			this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
 			this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormSelectionTest_Paint);
+			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormSelectionTest_KeyDown);
 			this.MouseDown += new System.Windows.Forms.MouseEventHandler(this.FormSelectionTest_MouseDown);
 			this.MouseMove += new System.Windows.Forms.MouseEventHandler(this.FormSelectionTest_MouseMove);
 			this.ResumeLayout(false);
+			this.PerformLayout();
 
 		}
 
 		#endregion
 
 		private System.Windows.Forms.Label labelStartText;
+		private System.Windows.Forms.Timer TimerVirtualGaze;
+		private System.Windows.Forms.Label label1;
 	}
 }

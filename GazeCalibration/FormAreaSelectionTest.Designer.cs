@@ -30,8 +30,8 @@
 		{
 			this.components = new System.ComponentModel.Container();
 			this.labelStartText = new System.Windows.Forms.Label();
-			this.timerGazeLost = new System.Windows.Forms.Timer(this.components);
 			this.timerVirtualGazeTimer = new System.Windows.Forms.Timer(this.components);
+			this.label1 = new System.Windows.Forms.Label();
 			this.SuspendLayout();
 			// 
 			// labelStartText
@@ -46,38 +46,46 @@
 			this.labelStartText.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
 			this.labelStartText.Click += new System.EventHandler(this.labelStartText_Click);
 			// 
-			// timerGazeLost
-			// 
-			this.timerGazeLost.Interval = 500;
-			this.timerGazeLost.Tick += new System.EventHandler(this.timerGazeLost_Tick);
-			// 
 			// timerVirtualGazeTimer
 			// 
+			this.timerVirtualGazeTimer.Interval = 50;
 			this.timerVirtualGazeTimer.Tick += new System.EventHandler(this.timerVirtualGazeTimer_Tick);
+			// 
+			// label1
+			// 
+			this.label1.AutoSize = true;
+			this.label1.Location = new System.Drawing.Point(10, 13);
+			this.label1.Name = "label1";
+			this.label1.Size = new System.Drawing.Size(51, 20);
+			this.label1.TabIndex = 2;
+			this.label1.Text = "label1";
 			// 
 			// FormAreaSelectionTest
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.ClientSize = new System.Drawing.Size(968, 646);
+			this.Controls.Add(this.label1);
 			this.Controls.Add(this.labelStartText);
 			this.DoubleBuffered = true;
 			this.Name = "FormAreaSelectionTest";
 			this.Text = "List Selection Test";
 			this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+			this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.FormAreaSelectionTest_FormClosed);
 			this.Load += new System.EventHandler(this.FormAreaSelectionTest_Load);
 			this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormAreaSelectionTest_Paint);
 			this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormAreaSelectionTest_KeyDown);
 			this.MouseDown += new System.Windows.Forms.MouseEventHandler(this.FormAreaSelectionTest_MouseDown);
 			this.MouseMove += new System.Windows.Forms.MouseEventHandler(this.FormAreaSelectionTest_MouseMove);
 			this.ResumeLayout(false);
+			this.PerformLayout();
 
 		}
 
 		#endregion
 
 		private System.Windows.Forms.Label labelStartText;
-		private System.Windows.Forms.Timer timerGazeLost;
 		private System.Windows.Forms.Timer timerVirtualGazeTimer;
+		private System.Windows.Forms.Label label1;
 	}
 }
