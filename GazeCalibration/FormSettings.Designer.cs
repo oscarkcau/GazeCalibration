@@ -31,6 +31,8 @@
 			this.propertyGridMain = new System.Windows.Forms.PropertyGrid();
 			this.panel1 = new System.Windows.Forms.Panel();
 			this.buttonClose = new System.Windows.Forms.Button();
+			this.buttonSave = new System.Windows.Forms.Button();
+			this.buttonLoad = new System.Windows.Forms.Button();
 			this.panel1.SuspendLayout();
 			this.SuspendLayout();
 			// 
@@ -45,6 +47,8 @@
 			// 
 			// panel1
 			// 
+			this.panel1.Controls.Add(this.buttonLoad);
+			this.panel1.Controls.Add(this.buttonSave);
 			this.panel1.Controls.Add(this.buttonClose);
 			this.panel1.Dock = System.Windows.Forms.DockStyle.Bottom;
 			this.panel1.Location = new System.Drawing.Point(0, 489);
@@ -54,6 +58,7 @@
 			// 
 			// buttonClose
 			// 
+			this.buttonClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
 			this.buttonClose.Location = new System.Drawing.Point(368, 14);
 			this.buttonClose.Name = "buttonClose";
 			this.buttonClose.Size = new System.Drawing.Size(105, 44);
@@ -61,6 +66,28 @@
 			this.buttonClose.Text = "Close";
 			this.buttonClose.UseVisualStyleBackColor = true;
 			this.buttonClose.Click += new System.EventHandler(this.buttonClose_Click);
+			// 
+			// buttonSave
+			// 
+			this.buttonSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+			this.buttonSave.Location = new System.Drawing.Point(12, 14);
+			this.buttonSave.Name = "buttonSave";
+			this.buttonSave.Size = new System.Drawing.Size(105, 44);
+			this.buttonSave.TabIndex = 1;
+			this.buttonSave.Text = "Save";
+			this.buttonSave.UseVisualStyleBackColor = true;
+			this.buttonSave.Click += new System.EventHandler(this.buttonSave_Click);
+			// 
+			// buttonLoad
+			// 
+			this.buttonLoad.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+			this.buttonLoad.Location = new System.Drawing.Point(123, 14);
+			this.buttonLoad.Name = "buttonLoad";
+			this.buttonLoad.Size = new System.Drawing.Size(105, 44);
+			this.buttonLoad.TabIndex = 2;
+			this.buttonLoad.Text = "Load";
+			this.buttonLoad.UseVisualStyleBackColor = true;
+			this.buttonLoad.Click += new System.EventHandler(this.buttonLoad_Click);
 			// 
 			// FormSettings
 			// 
@@ -83,5 +110,7 @@
 		private System.Windows.Forms.PropertyGrid propertyGridMain;
 		private System.Windows.Forms.Panel panel1;
 		private System.Windows.Forms.Button buttonClose;
+		private System.Windows.Forms.Button buttonLoad;
+		private System.Windows.Forms.Button buttonSave;
 	}
 }

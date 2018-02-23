@@ -10,12 +10,13 @@ using Emgu.CV.CvEnum;
 using System.Diagnostics;
 using System.Threading;
 using System.ComponentModel;
+using System.Xml.Serialization;
 
 namespace GazeCalibration
 {       // public enum
 	public enum FixationState { NotFocusing, Focusing, Locked };
 
-	class FixationDetector
+	public class FixationDetector
 	{
 		// public event
 		public event EventHandler FixationLocked;
@@ -31,12 +32,12 @@ namespace GazeCalibration
 		[Category("Fixation Region")] public int RegionReleaseRadius { get; set; } = 100; // pixels
 
 		// public properties
-		[Browsable(false)] public Vector AveragedGazePosition { get; private set; }
-		[Browsable(false)] public Queue<(Point gazePosition, Matrix<double> feature, long time)>
+		[XmlIgnore] [Browsable(false)] public Vector AveragedGazePosition { get; private set; }
+		[XmlIgnore] [Browsable(false)] public Queue<(Point gazePosition, Matrix<double> feature, long time)>
 			LastGazePositions { get; } = new Queue<(Point, Matrix<double>, long)>();
-		[Browsable(false)] public FixationState FixationState { get; private set; } = FixationState.NotFocusing;
-		[Browsable(false)] public double FixationRegionRadius { get; private set; }
-		[Browsable(false)] public long ElapsedMilliseconds { get => stopwatch.ElapsedMilliseconds; }
+		[XmlIgnore] [Browsable(false)] public FixationState FixationState { get; private set; } = FixationState.NotFocusing;
+		[XmlIgnore] [Browsable(false)] public double FixationRegionRadius { get; private set; }
+		[XmlIgnore] [Browsable(false)] public long ElapsedMilliseconds { get => stopwatch.ElapsedMilliseconds; }
 
 		// private fields
 		Stopwatch stopwatch = new Stopwatch();

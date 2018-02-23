@@ -102,6 +102,7 @@
     <Compile Include="RidgeRegression.cs" />
     <Compile Include="Vector.cs" />
     <Compile Include="VirtualMouse.cs" />
+    <Compile Include="XmlColor.cs" />
     <EmbeddedResource Include="FormCalibration.resx">
       <DependentUpon>FormCalibration.cs</DependentUpon>
     </EmbeddedResource>

@@ -16,7 +16,7 @@ namespace GazeCalibration
 	public partial class FormCalibration : Form
 	{
 		// settings class
-		private class Settings
+		public class Settings
 		{
 			public float[] GridLinePositions { get; set; } = { 0.1f, 0.3f, 0.5f, 0.7f, 0.9f };
 			public int GazeLostTime { get; set; } = 500;

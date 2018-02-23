@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Serialization;
 
 namespace GazeCalibration
 {
@@ -26,18 +27,19 @@ namespace GazeCalibration
 			UInt32 fWinIni);
 
 		// public setting class
-		class Settings
+		public class Settings
 		{
-			[TypeConverter(typeof(ExpandableObjectConverter))] public FixationDetector FixationDetector { get; set; }
-			public int NumOfTrials { get; set; } = 50;
-			public int TargetRadius { get; set; } = 10;
-			public int MinimumDistance { get; set; } = 200;
-			public Color TargetColor { get; set; } = Color.Green;
-			public Color TargetOverColor { get; set; } = Color.Red;
-			public int DefaultMouseSpeed { get; set; } = 12;
-			public int MinimumMouseSpeed { get; set; } = 5;
-			public bool UpdateRegressionModel { get; set; } = true;
-			public bool ShowFixitation { get; set; } = false;
+			[Category("Test")] public int NumOfTrials { get; set; } = 50;
+			[Category("Target")] public int MinimumDistance { get; set; } = 200;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor { get; set; } = Color.Green;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetOverColor { get; set; } = Color.Red;
+			[Category("Test Factor")] public int TargetRadius { get; set; } = 10;
+			[Category("Test Factor")] public int DefaultMouseSpeed { get; set; } = 12;
+			[Category("Test Factor")] public int MinimumMouseSpeed { get; set; } = 5;
+			[Category("Test Factor")] public int MouseSpeedAdjustmentRadius { get; set; } = 200;
+			[Category("Gaze Tracking")] public bool UpdateRegressionModel { get; set; } = true;
+			[Category("Fixation")] [TypeConverter(typeof(ExpandableObjectConverter))] public FixationDetector FixationDetector { get; set; }
+			[Category("Fixation")] public bool ShowFixitation { get; set; } = false;
 		}
 
 		enum GazeDisplayMode { None, Individal, Average };
@@ -96,7 +98,8 @@ namespace GazeCalibration
 			// update mouse speed
 			int min = settings.MinimumMouseSpeed;
 			int max = settings.DefaultMouseSpeed;
-			int sp = (int)distFromFixation.MapTo(0, 200, min, max);
+			int r = settings.MouseSpeedAdjustmentRadius;
+			int sp = (int)distFromFixation.MapTo(0, r, min, max);
 			sp = sp.LimitToRange(min, max);
 			SystemParametersInfo(SPI_SETMOUSESPEED, 0, (uint)sp, 0);
 			label1.Text = sp.ToString();
@@ -288,6 +291,7 @@ namespace GazeCalibration
 			{
 				foreach (var (_, feature, _) in fixationDetector.LastGazePositions)
 				{
+					if (feature == null) continue;
 					formMain.RegressionX.AddFeature(feature, currentTarget.X, false);
 					formMain.RegressionY.AddFeature(feature, currentTarget.Y, false);
 				}

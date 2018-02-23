@@ -12,21 +12,22 @@ using Emgu.CV;
 using Emgu.CV.Structure;
 using Emgu.CV.CvEnum;
 using System.Threading;
+using System.Xml.Serialization;
 
 namespace GazeCalibration
 {
 	public partial class FormAreaSelectionTest : Form
 	{
-		class Settings
+		public class Settings
 		{
 			[Category("Test")] public int NumOfTrials { get; set; } = 30;
 			[Category("Test")] public int MinTrialDistance { get; set; } = 300;
 
 			[Category("Target")] public int NumOfTargets { get; set; } = 100;
 			[Category("Target")] public int TargetRadius { get; set; } = 6; // pixels
-			[Category("Target")] public Color TargetColor { get; set; } = Color.LimeGreen;
-			[Category("Target")] public Color TargetColor2 { get; set; } = Color.Red;
-			[Category("Target")] public Color TargetColor3 { get; set; } = Color.Orange;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor { get; set; } = Color.LimeGreen;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor2 { get; set; } = Color.Red;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor3 { get; set; } = Color.Orange;
 			[Category("Target")] public int MinDistance { get; set; } = 10; // pixels
 			[Category("Target")] public double SliverTriangleThreshold { get; set; } = Math.PI / 4; // radian
 			[Category("Target")] public bool ShowTargetAdjacency { get; set; } = false;

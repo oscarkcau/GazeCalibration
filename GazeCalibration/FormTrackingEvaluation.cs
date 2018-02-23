@@ -12,19 +12,20 @@ using System.IO;
 using Emgu.CV;
 using Emgu.CV.Structure;
 using Emgu.CV.CvEnum;
+using System.Xml.Serialization;
 
 namespace GazeCalibration
 {
 	public partial class FormTrackingEvaluation : Form
 	{
 		// public setting class
-		class Settings
+		public class Settings
 		{
-			public bool UpdateTrackingModel { get; set; } = true;
-			public int TargetRadius { get; set; } = 20;
-			public Color TargetColor { get; set; } = Color.Green;
-			public Color TargetColor2 { get; set; } = Color.Red;
-			public float[] GridLinePositions { get; set; } = { 0.05f, 0.2f, 0.4f, 0.6f, 0.8f, 0.95f };
+			[Category("Target")] public int TargetRadius { get; set; } = 20;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor { get; set; } = Color.Green;
+			[Category("Target")] [XmlElement(Type = typeof(XmlColor))] public Color TargetColor2 { get; set; } = Color.Red;
+			[Category("Gaze Tracking")] public float[] GridLinePositions { get; set; } = { 0.05f, 0.2f, 0.4f, 0.6f, 0.8f, 0.95f };
+			[Category("Gaze Tracking")] public bool UpdateTrackingModel { get; set; } = true;
 
 			[Category("Fixation")] [TypeConverter(typeof(ExpandableObjectConverter))]
 			public FixationDetector FixationDetector { get; set; }

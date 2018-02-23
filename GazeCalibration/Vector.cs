@@ -7,7 +7,7 @@ using System.Drawing;
 
 namespace GazeCalibration
 {
-	struct Vector
+	public struct Vector
 	{
 		// public properties
 		public float X { get; set; }
